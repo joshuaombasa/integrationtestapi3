@@ -16,7 +16,7 @@ beforeEach(async () => {
 
 
 describe('when there are initially some products', () => {
-  test('products are returned as JSON', async () => {
+  test('products are returned as JSON', async () => {       
     await api.get('/api/products')
       .expect(200)
       .expect('Content-Type', /application\/json/)
@@ -69,7 +69,7 @@ describe('addition of a new product', () => {
     expect(productsInDbAtStart).toHaveLength(productsInDbAtEnd.length - 1)
   })
 
-  test('faild with statuscode 400 when given valid data', async () => {
+  test('failed with statuscode 400 when given valid data', async () => {
     const productsInDbAtStart = await helper.productsInDb()
     const response = await api.post('/api/products')
       .send({ price: 70 })
@@ -80,7 +80,7 @@ describe('addition of a new product', () => {
 })
 
 describe('deleting a product', () => {
-  test('succeeds when given a valid id', async () => {
+  test('succeeds  given an id', async () => {
     const productsInDb = await helper.productsInDb()
     await api.delete(`/api/products/${productsInDb[0].id}`)
       .expect(204)
