@@ -1,92 +1,103 @@
 const mongoose = require('mongoose')
+const supertest = require('supertest')
+const app = require('../app')
 const Product = require('../models/product')
 const helper = require('./test-helper')
-const app = require('../app')
-const supertest = require('supertest')
+
 const api = supertest(app)
 
 beforeEach(async () => {
   await Product.deleteMany({})
-
-  for (let product of helper.productsList) {
-    const productObject = new Product(product)
-    await productObject.save()
-  }
+  // Save all products concurrently for efficiency
+  const productObjects = helper.productsList.map(product => new Product(product))
+  await Promise.all(productObjects.map(product => product.save()))
 })
 
-
-describe('when there are initially some products', () => {
-  test('products are returned as JSON', async () => {       
+describe('GET /api/products', () => {
+  test('returns products as JSON', async () => {
     await api.get('/api/products')
       .expect(200)
       .expect('Content-Type', /application\/json/)
   })
 
-  test('all products are returned', async () => {
+  test('returns all products', async () => {
     const response = await api.get('/api/products')
-      .expect(200)
-      .expect('Content-Type', /application\/json/)
     expect(response.body).toHaveLength(helper.productsList.length)
   })
 
-  test('a specific product is among the products that are returned', async () => {
+  test('contains a specific product', async () => {
     const response = await api.get('/api/products')
-      .expect(200)
-      .expect('Content-Type', /application\/json/)
-    const titles = response.body.map(t => t.title)
+    const titles = response.body.map(product => product.title)
     expect(titles).toContain(helper.productsList[0].title)
   })
 })
 
-describe('fetching a single product', () => {
-  test('succeeds when given a valid id', async () => {
+describe('GET /api/products/:id', () => {
+  test('succeeds with a valid id', async () => {
     const productsInDb = await helper.productsInDb()
-    const response = await api.get(`/api/products/${productsInDb[0].id}`)
+    const productToView = productsInDb[0]
+    const response = await api.get(`/api/products/${productToView.id}`)
       .expect(200)
       .expect('Content-Type', /application\/json/)
+    
+    // Verify that the returned product data matches the expected product
+    expect(response.body.title).toEqual(productToView.title)
+    expect(response.body.price).toEqual(productToView.price)
   })
 
-  test('fails with statuscode 404 when given a non-existent id', async () => {
+  test('fails with status code 404 for a non-existent id', async () => {
     const nonExistentId = await helper.nonExistentId()
-    const response = await api.get(`/api/products/${nonExistentId}`)
+    await api.get(`/api/products/${nonExistentId}`)
       .expect(404)
   })
 
-  test('fails with statuscode 400 when given a invalid id', async () => {
-    const response = await api.get('/api/products/&*')
+  test('fails with status code 400 for an invalid id', async () => {
+    await api.get('/api/products/invalid-id')
       .expect(400)
   })
 })
 
-describe('addition of a new product', () => {
-  test('succeeds when given valid data', async () => {
-    const productsInDbAtStart = await helper.productsInDb()
-    const response = await api.post('/api/products')
-      .send({ title: 'product7', price: 70 })
+describe('POST /api/products', () => {
+  test('creates a new product with valid data', async () => {
+    const newProduct = { title: 'New Product', price: 99 }
+    await api.post('/api/products')
+      .send(newProduct)
       .expect(201)
       .expect('Content-Type', /application\/json/)
-    const productsInDbAtEnd = await helper.productsInDb()
-    expect(productsInDbAtStart).toHaveLength(productsInDbAtEnd.length - 1)
+
+    const productsAtEnd = await helper.productsInDb()
+    expect(productsAtEnd).toHaveLength(helper.productsList.length + 1)
+
+    const titles = productsAtEnd.map(p => p.title)
+    expect(titles).toContain(newProduct.title)
   })
 
-  test('failed with statuscode 400 when given valid data', async () => {
-    const productsInDbAtStart = await helper.productsInDb()
-    const response = await api.post('/api/products')
-      .send({ price: 70 })
+  test('fails with status code 400 if data is invalid', async () => {
+    const invalidProduct = { price: 70 }  // Missing required 'title'
+    await api.post('/api/products')
+      .send(invalidProduct)
       .expect(400)
-    const productsInDbAtEnd = await helper.productsInDb()
-    expect(productsInDbAtStart).toHaveLength(productsInDbAtEnd.length)
+
+    const productsAtEnd = await helper.productsInDb()
+    expect(productsAtEnd).toHaveLength(helper.productsList.length)
   })
 })
 
-describe('deleting a product', () => {
-  test('succeeds  given an id', async () => {
+describe('DELETE /api/products/:id', () => {
+  test('succeeds in deleting a product', async () => {
     const productsInDb = await helper.productsInDb()
-    await api.delete(`/api/products/${productsInDb[0].id}`)
+    const productToDelete = productsInDb[0]
+
+    await api.delete(`/api/products/${productToDelete.id}`)
       .expect(204)
+
+    const productsAtEnd = await helper.productsInDb()
+    expect(productsAtEnd).toHaveLength(helper.productsList.length - 1)
+
+    const titles = productsAtEnd.map(p => p.title)
+    expect(titles).not.toContain(productToDelete.title)
   })
 })
-
 
 afterAll(async () => {
   await mongoose.connection.close()
