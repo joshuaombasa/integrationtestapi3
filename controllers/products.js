@@ -1,7 +1,7 @@
 const express = require('express')
 const productsRouter = express.Router()
 const jwt =  require('jsonwebtoken')
-const bcrypt = import('bcrypt')
+const bcrypt = require('bcrypt')
 
 const Product = require('../models/product')
 
