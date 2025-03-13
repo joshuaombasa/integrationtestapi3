@@ -1,19 +1,20 @@
-const mongoose = require('mongoose')
+const mongoose = require('mongoose');
 
+const productSchema = new mongoose.Schema(
+  {
+    title: { type: String, required: true, trim: true },
+    price: { type: Number, required: true, min: 0 },
+  },
+  { timestamps: true } // Adds createdAt and updatedAt fields
+);
 
-const productSchema = new mongoose.Schema({
-  title: { type: String, required: true },
-  price: { type: Number, required: true },
-})
-
+// Customize JSON response
 productSchema.set('toJSON', {
-  transform: (document, returnedObject) => {
-    returnedObject.id = returnedObject._id.toString()
+  transform: (_doc, obj) => {
+    obj.id = obj._id.toString();
+    delete obj._id;
+    delete obj.__v;
+  },
+});
 
-    delete returnedObject._id
-    delete returnedObject.__v
-
-  }
-})
-
-module.exports = mongoose.model('Product', productSchema)
+module.exports = mongoose.model('Product', productSchema);
